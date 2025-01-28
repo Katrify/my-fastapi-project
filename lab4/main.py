@@ -53,7 +53,7 @@ apiv2_router = APIRouter()
 
 @app.get("/")
 def read_root():
-return {"message": "Hello, Render!"}
+    return {"message": "Hello, Render!"}
 
 # GET
 @app.get("/tasks/{task_id}")
