@@ -51,10 +51,6 @@ def find_task_by_id(task_id: int):
 apiv1_router = APIRouter()
 apiv2_router = APIRouter()
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello, Render!"}
-
 # GET
 @app.get("/tasks/{task_id}")
 def read_tasks(task_number: Optional[int] = None):
