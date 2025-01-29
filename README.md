@@ -16,3 +16,7 @@ This activity focuses on **JSON as a primary data format for APIs**, teaching st
 ### Laboratory Activity #4: Advanced API Implementation
 This activity focuses on advanced API development by implementing **versioning, authentication, and HTTP exception handling** in FastAPI. Students will create two API versions (`apiv1` and `apiv2`) while ensuring proper HTTP status codes and error handling. Additionally, environment variables will be used to manage API keys securely, reinforcing best practices in API security and deployment.
 
+###Laboratory Activity #5: Deploying API in Cloud
+
+This activity focuses on developing and deploying an API to a cloud platform. Students will deploy their Laboratory Activity #4 project to Render, following the provided deployment guide. This hands-on exercise helps students understand cloud deployment, service hosting, and API accessibility over the internet.
+
