@@ -1,206 +1,146 @@
-from fastapi import FastAPI, HTTPException, Depends, Request, APIRouter
-from pydantic import BaseModel
+##########################################################################################################
+#   In this activity, we are going to try to use an external API to manipulate and play with.
+#   Our end goal here is to
+#   1. Understand how to get values from an API
+#   2. Use the values from the API and manipulate it accordingly using Python
+#   3. Create another API that utilizes multiple APIs
+#   4. Return data from Python into a valid JSON string.
+#
+
+# requests is a module that enables users to perform API calls
+# You can download this by doing pip install requests (or just install the requirements.txt file that comes with this code.)
+import requests
+
+# json is native module in Python that enables users to parse JSON strings into Python data types (list, dictionary, tuples, etc.)
+# and vice versa. This is a native module so there is no need to install this as this comes with the installation of Python
+import json 
+
+# FastAPI imports
+from fastapi import FastAPI
 from typing import Optional
-from dotenv import load_dotenv
-import os
 
-# Load environment variables from .env file
-load_dotenv()
-
-# Get the API Key from environment variables
-API_KEY = os.getenv("LAB4_API_KEY")
-if not API_KEY:
-    raise RuntimeError("API key not found in environment variables")
-
-# Initialize the FastAPI app
+# Instantiates the FastAPI class
 app = FastAPI()
 
-# Sample data to represent Laboratories (TO-DO-LIST)
-task_db = [
-    {"task_id": 1, "task_title": "Laboratory Activity", "task_desc": "Create Lab Act 1", "is_finished": False},
-    {"task_id": 2, "task_title": "Laboratory Activity", "task_desc": "Create Lab Act 2", "is_finished": False},
-    {"task_id": 3, "task_title": "Laboratory Activity", "task_desc": "Create Lab Act 3", "is_finished": False},
-]
-
-# Task model for data validation
-class Task(BaseModel):
-    task_id: int
-    task_title: str
-    task_desc: str
-    is_finished: bool
-
-# API Key Authentication (Header-based or Query Parameter)
-def verify_api_key(request: Request):
-    # Check API key in headers
-    api_key_header = request.headers.get("x-api-key")
-    # Check API key in query parameters
-    api_key_query = request.query_params.get("LAB4_API_KEY")
-
-    if api_key_header != API_KEY and api_key_query != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API Key")
-    return True
-
-# Helper function to find task by task_id
-def find_task_by_id(task_id: int):
-    for task in task_db:
-        if task["task_id"] == task_id:
-            return task
-    return None
-
-# API Versioning with routers
-apiv1_router = APIRouter()
-apiv2_router = APIRouter()
-
-# GET
-@app.get("/tasks/{task_id}")
-def read_tasks(task_number: Optional[int] = None):
-
-    #If user input is a negative number
-    if task_number is not None and task_number < 0:
-        return {"INVALID INPUT":"The task number input must not be a negative number"}
+# Example # 1: We are trying to get the values from an external API. We used a query parameter to make the API scalable to different API calls
+# to the external API
+@app.get("/posts/")
+def get_posts(postId: Optional[int] = None):
+    if postId is None:
+        posts = requests.get('https://jsonplaceholder.typicode.com/posts')
+        response = json.loads(posts.text)
+    else:
+        posts = requests.get(f'https://jsonplaceholder.typicode.com/posts/{postId}')
+        response = json.loads(posts.text)
     
-    if task_number:        
+    return response
 
-        for u in task_db: 
-            #if the user input was available at the task_db
-            if u["task_id"] == task_number:
-                return {"STATUS": "Okay", "result" : u}
-        
-        #If task_id is not in the task_db
-        if task_number != u["task_id"]:
-            return {"NOTICE": "Task cannot be found"}
-
-    #If the user did not input a task number
-    return {"ERROR": "Task number is not provided, please put a task number to display a task before executing"}
-@app.get("/")
-def read_root():
-return {"message": "Hello, Render!"}
-
-# POST
-@app.post("/tasks")
-def create_tasks(list: Task):
-    #If the user input is empty
-    if list.task_id == 0:
-        return {"ERROR": "Task number is not provided, please put a task number to display a task before executing"}
+@app.get("/comments/")
+def get_comments(postId: Optional[int] = None):
+    if postId is None:
+        comments = requests.get('https://jsonplaceholder.typicode.com/comments')
+        response = json.loads(comments.text)
+    else:
+        comments = requests.get(f'https://jsonplaceholder.typicode.com/comments/?postId={postId}')
+        response = json.loads(comments.text)
     
-    #If task_id already existing
-    if any(u['task_id'] == list.task_id for u in task_db):
-        return {"ERROR": "Task number already existing"}
-    #If user input is a negative number
-    if list.task_id is not None and list.task_id <= -0:
-            return {"INVALID INPUT":"The task number input must not be a negative number"}
+    return response
 
+# Example #2: : We are trying to get the values from an external API. We used a path parameter to ensure that we are requiring the parameter.
+# After calling the API, we format the data according to our preference by accessing the values of the JSON string.
+@app.get("/formatted_posts/{userID}")
+def get_post_then_format_according_to_user(userID: Optional[int] = None):
+    # We get the data from the get_post function above. In this case, we are calling it as a function.
+    posts = get_posts()
 
-    #If new Data is successfully created
-    task_db.append(dict(list))
-    return {"Status": "Okay"}
+    # Create the new format of data that we want to present
+    data = {"userID": userID, "posts": []}
 
+    # Enumerate the posts, then filter the user ID based on the parameter
+    # Then add it to the posts value
+    for idx, u in enumerate(posts):
 
+        # Take note here that in Python, to get the value of a key in a dictionary, we use the [] notation
+        # where in the string inside the [] is the key of the value in the dictionary.
+        if u['userId'] == userID:
+            data["posts"].append({
+                "post_title": u["title"],
+                "post_body": u["body"],
+            })
+    return data
 
-# DELETE
-@app.delete("/tasks/{task_id}")
-def delete_tasks(task_number: Optional[int] = None):
-    #If user input is a negative number
-    if task_number is not None and task_number < 0:
-        return {"INVALID INPUT":"The task number input must not be a negative number"}
-    if task_number:
+@app.get("/formatted_comment/{postID}")
+def get_post_then_format_according_to_user(postID: int):
+    # We get the data from the get_comments function above. In this case, we are calling it as an API
+    req = requests.get(f'http://127.0.0.1:8000/comments/?postId={postID}')
+    comments = json.loads(req.text)
 
-        for idx, u in enumerate(task_db):
-            #if the user input was available at the task_db is successfully  deleted
-            if u["task_id"] == task_number:
-                task_db.remove(u)
-                return {"Status": "Okay", "Task is successfully deleted": u}
+    # Create the new format of data that we want to present
+    data = {"post_id": postID, "comments": []}
 
-        #If task_id is not in the task_db
-        if task_number != u["task_id"]:
-            return {"NOTICE": "Task cannot be found"}
-    #If the user input is empty
-    return {"ERROR": "Task number is not provided, please put a task number to delete a task before executing"}
+    # Enumerate the comments, then filter the post ID based on the parameter
+    # Then add it to the comments value
+    for idx, c in enumerate(comments):
+        # Take note here that in Python, to get the value of a key in a dictionary, we use the [] notation
+        # where in the string inside the [] is the key of the value in the dictionary.
+        if c['postId'] == postID:
+            data["comments"].append({
+                "commenter_email": c["email"],
+                "commenter_name": c["name"],
+                "comment": c["body"],
+            })
+    return data
 
-# PATCH
-@app.patch("/tasks/{task_id}")
-def update_tasks(task_id: int, list: Task):
+############################################################################################################
+##      PUT YOUR LAB ACTIVITY 4 ANSWER BELOW
+##      - Create a new API that has the following specs:
+##              Endpoint: /detailed_post/{userID}
+##              Method: GET
+##      - Given the userID, you should show all the post of that specific user and all comments per each post.
+##      - Use necessary key names based on the value to be outputted.
+############################################################################################################
+@app.get("/detailed_post/{userID}")
+def get_detailed_post(userID: int):
 
+    #Ife-fetch yung mga Post para sa mga binigay na User ID
+    posts = get_posts()
+    # Create the new format of data that we want to present
+    #Eto din yung part ng Output kung saan makikita natin yung User ID pati yung post na naglalaman nung mga TITLE/BODY/COMMENTS/ETC.
+    detailed_data = {"userID": userID, "posts": []}
 
-    if task_id:
-        # Find user by task_id
-        for idx, u in enumerate(task_db):
-            #If all data has been updated in user input
-            if u["task_id"] == task_id:
-                task_db[idx]['task_id'] = list.task_id
-                task_db[idx]['task_title'] = list.task_title
-                task_db[idx]['task_desc'] = list.task_desc
-                task_db[idx]['is_finished'] = list.is_finished
+    # Ifi-filter ang user id based sa parameter 
+    # Then i-a-add ito sa post value
+    for p in posts:
+        if p['userId'] == userID:
+            # Ife-fetch yung mga comments para sa bawat post
+            req = requests.get(f'http://127.0.0.1:8000/comments/?postId={p["id"]}')
+            comments = json.loads(req.text)
+            #Eto na yung part ng JSON format na makikita natin sa output, lahat ng TITLE/BODY/COMMENTS/NAME/EMAIL/
+            #Ay nanggaling doon sa http link.(EXTERNAL API) na ige-get dipende sa given na User ID so specific lang
+            #Ang mga users na lalabas.
+            post_data = {
+                "post_title": p["title"],
+                "post_body": p["body"],
+                "comments": []
+            }
 
-                return {"status": "ok", "updated_data": task_db[idx]}
-            #If user input is a negative number
-            if task_id is not None and task_id <= -0:
-                return {"INVALID INPUT":"The task number input must not be a negative number"}
-            
+            #I-a-add(append) yung mga comments doon sa post
+            #Comments na nagko-contain nung mga info na makikita din sa output
+            for c in comments:
+                post_data["comments"].append(
+                    {
+                    "post_id": p["id"],
+                    "id": c["id"],
+                    "name": c["name"],
+                    "email": c["email"],
+                    "comment": c["body"],
+                }
+                )
 
-    # Return an error message if there is no user found
-    return {"error": "User not found. Cannot update record"}
+  
+            #Lahat ng process na nasa taas na pag-combine ang comments sa post is mapupunta or ma-a-add(append) sa detailed_data
+            #na syang itatawag by user ID
+            detailed_data["posts"].append(post_data)
 
-# Version 2 - GET (Requires Authentication)
-
-@apiv2_router.get("/tasks", dependencies=[Depends(verify_api_key)])#after requesting a request method, need muna mag-input ng API key bago mabigay ng response 
-def read_all_tasks_v2():
-    if not task_db:
-        raise HTTPException(status_code=404, detail="Task not found")#If walang tasks na nahanap
-    return {"STATUS": "Okay", "tasks": task_db} #After ng response, may ganitong status
-    
-@apiv2_router.get("/tasks/{task_id}", dependencies=[Depends(verify_api_key)])#after requesting a request method, need muna mag-input ng API key bago mabigay ng response 
-def read_task_v2(task_id: int):
-    if task_id < 0:
-        raise HTTPException(status_code=400, detail="Task ID must not be negative")#If yung task id na in-input is negative number
-    
-    task = find_task_by_id(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return {"STATUS": "Okay", "result": task}
-
-# Version 2 - POST (Requires Authentication)
-@apiv2_router.post("/tasks", dependencies=[Depends(verify_api_key)])#after requesting a request method, need muna mag-input ng API key bago mabigay ng response 
-def create_task_v2(task: Task):
-    if task.task_id <= 0:
-        raise HTTPException(status_code=400, detail="Invalid Task ID")#If yung in-input na task id is invalid
-    if any(t['task_id'] == task.task_id for t in task_db):
-        raise HTTPException(status_code=400, detail="Task ID already exists")#If yung task id na na-create is existing na
-    
-    task_db.append(task.dict())
-    return {"Status": "Task created successfully"}#If succesfull yung bagong na-create na task id.
-
-# Version 2 - DELETE (Requires Authentication)
-@apiv2_router.delete("/tasks/{task_id}", dependencies=[Depends(verify_api_key)])#after requesting a request method, need muna mag-input ng API key bago mabigay ng response 
-def delete_task_v2(task_id: int):
-    if task_id < 0:
-        raise HTTPException(status_code=400, detail="Task ID must not be negative")
-    
-    task = find_task_by_id(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
-    task_db.remove(task)
-    return {"Status": "Task deleted successfully", "Deleted Task": task}#If succesfull yung bagong na-delete na task id.
-
-# Version 2 - PATCH (Requires Authentication)
-@apiv2_router.patch("/tasks/{task_id}", dependencies=[Depends(verify_api_key)])#after requesting a request method, need muna mag-input ng API key bago mabigay ng response 
-def update_task_v2(task_id: int, updated_task: Task):
-    if task_id < 0:
-        raise HTTPException(status_code=400, detail="Task ID must not be negative")
-    
-    task = find_task_by_id(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
-    task.update(updated_task.dict())
-    return {"Status": "Task updated successfully", "Updated Task": task}#If succesfull yung bagong na-update na task id.
-
-# Register Version 1 and Version 2 Routers
-app.include_router(apiv1_router, prefix="/apiv1")
-app.include_router(apiv2_router, prefix="/apiv2")
-
-# Protected Route Example
-@app.get("/protected-route", dependencies=[Depends(verify_api_key)])#after requesting a request method, need muna mag-input ng API key bago mabigay ng response 
-async def protected():
-    return {"message": "You have access to this protected route"}
+    # I-re-return yung final detailed_data bilang isang JSON format once na ni-run yung code.
+    return detailed_data
